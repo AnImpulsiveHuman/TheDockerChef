@@ -5,9 +5,11 @@ from slackeventsapi import SlackEventAdapter
 from threading import Thread
 import iclasses
 
-# Slack secret vars. Temporarily hardcode. Change it later.
-SLACK_TOKEN = "xoxb-2663624307237-2669072106326-GxwWg2d9zXB7dIdMdWdn5K2r"
-SIGNING_SEC = "ab0a7347e231932a03c23e31ace47fc9"
+load_dotenv()
+
+# Slack secret tokens from .env
+SLACK_TOKEN = os.getenv('SLACK_TOKEN')
+SIGNING_SEC = os.getenv('SIGNING_SEC')
 
 parent_dir = "allfiles/"
 
