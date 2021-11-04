@@ -107,13 +107,9 @@ class CreateDockerfile:
         info_dict = {}
         info_dict.setdefault("tools", self.tools)
 
-        print("\n")
-        print(info_file)
-        print("\n")
-        print(info_dict)
-
         # Should handle the error. One error faced - expects 1 positional argument but 2 found
-        json.dump(info_dict,open(info_file,'w'))
+
+        json.dump(info_dict, open(info_file, 'w'))
 
         self.status = "Created info file. You can get more info on the image using \"?/info <image>\""
 
@@ -155,7 +151,7 @@ class ManageImage:
 
     def remove_images(self):
 
-        # Delete the image locally
+        # Deleting the image locally
 
         client = docker.from_env()
         print(client.login("everythingtogold", DOCKER_PASS, DOCKER_MAIL))
@@ -163,25 +159,31 @@ class ManageImage:
         self.status = "Removed image locally"
 
         # Delete the image from Dockerhub
+
         docker_id = "everythingtogold"
         repo = "gold"
-        # Change this to use requests module instead of using the os module
-        delete_url = "curl -u " + docker_id + ":" + DOCKER_PASS + " -X \"DELETE\" https://cloud.docker.com/v2/repositories/" + docker_id + "/" + repo + "/tags/" + self.image_name + "/"
-        #delete_url = "https://cloud.docker.com/v2/repositories/" + docker_id + "/" + repo + "/tags/" + self.image_name + "/"
-        x = os.system(delete_url)
-        #x = requests.delete(delete_url, auth=(docker_id, DOCKER_PASS))
 
-        #if(x.status_code) != 200:
-        #    print("Requests status code:\n")
-        #    print(x)
-        #self.status = str(x)
+        dockerhub_url = "https://hub.docker.com/v2/repositories/" + docker_id + "/" + repo + "/tags/" + self.image_name + "/"
+
+        # Change this to use requests module instead of using the os module
+
+        token_cmd = "HUB_TOKEN=$(curl -s -H \"Content-Type: application/json\" -X POST -d \'{\"username\": \"everythingtogold\", \"password\": \"View your organizations\"}\' https://hub.docker.com/v2/users/login/ | jq -r .token)"
+        #token_cmd = token_cmd.replace("username", docker_id)
+        #token_cmd = token_cmd.replace("password", DOCKER_PASS)
+
+        remove_cmd = "curl -i -X DELETE -H \"Accept: application/json\" -H \"Authorization: JWT $HUB_TOKEN\" " + dockerhub_url
+
+        os.system(token_cmd)
+        os.system(remove_cmd)
+
+        # Deleting the dockerfile and the info file
+
         dockerfile = self.parent_dir + "/" + self.username + "/" + self.image_name
         info_file = dockerfile + ".info"
         os.remove(dockerfile)
         os.remove(info_file)
-        print("\n")
-        print(x)
-        self.status = str(x)
+
+        self.status = "*Removed the image*"
 
     def get_images(self):
         """
@@ -208,9 +210,12 @@ class ManageImage:
 
         info_file_path = self.parent_dir + "/" + self.username + "/" + self.image_name + ".info"
 
-        info_dict = json.load(open(info_file_path))
-        for key in info_dict:
-            self.info = self.info + key + ": " + info_dict[key] + "\n"
+        try:
+            info_dict = json.load(open(info_file_path))
+            for key in info_dict:
+                self.info = self.info + key + ": " + info_dict[key] + "\n"
+        except FileNotFoundError:
+            self.info = "*Oops, image not found*"
 
 class EditImage:
 
@@ -240,20 +245,34 @@ class EditImage:
                 pattern = "apt-get install -y"
 
                 # Removes the unwanted tools from the original RUN Instr
+
                 for run in runline:
                     t = re.sub(pattern, '', run)
                     if t.strip(" ") in self.removetools_list:
                         runline.remove(run)
 
                 # Should join or else cant join this with our dockerfile as this is list.
+
                 old_dockerfile[i] = "&&".join(runline)
 
         # writing the new contents to the dockerfile
+
         updated_dockerfile = "".join(old_dockerfile)
         with open(self.dockerfile, 'w') as updated:
             updated.write(updated_dockerfile)
 
         # Remove the removed tools from the info file
+
+        info_dict = json.load(open(self.dockerfile + ".info"))
+        tools_list = info_dict['tools'].split(",")
+
+        for tool in tools_list:
+            if tool in self.removetools_list:
+                tools_list.remove(tool)
+
+        tools = ",".join(tools_list)
+        info_dict.update({'tools': tools})
+        json.dump(info_dict, open(self.dockerfile + ".info", 'w'))
 
         self.status = "Removed tools"
 
